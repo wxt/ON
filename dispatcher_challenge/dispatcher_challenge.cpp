@@ -39,7 +39,7 @@ auto help_command = R"(
  {
   "command":"help",
   "payload": {
-    "usage":"Enter json command in 'command':'<command>','payload': { // json payload of arguments }",
+    "usage":"Enter json command in 'command':'<command>','payload': { // json payload of arguments }"
   }
  }
 )";
@@ -71,9 +71,9 @@ auto reloadUser_command = R"(
  }
 )";
 
-auto reloadUser_command = R"(
+auto deviceHealth_command = R"(
  {
-  "command":"healthStatus",
+  "command":"deviceHealth",
   "payload": {
      "status":"healthy."
   }
@@ -82,6 +82,11 @@ auto reloadUser_command = R"(
 
 // ----------------------------------------------------------------------------------------------- //
 
+///
+/// @brief Check the json object is NULL or not
+///
+/// @param json The json to check
+///
 INLINE bool isNull(const rapidjson::Value &JSON )
 {
 	return false;
@@ -89,6 +94,11 @@ INLINE bool isNull(const rapidjson::Value &JSON )
 
 // ----------------------------------------------------------------------------------------------- //
 
+///
+/// @brief Output message to console
+///
+/// @param str The string message to output to console.
+///
 INLINE void consoleOut(const std::string &str)
 {
 	std::cout << str << std::endl;
@@ -96,17 +106,22 @@ INLINE void consoleOut(const std::string &str)
 
 // ----------------------------------------------------------------------------------------------- //
 
-
+///
+/// @brief controller class
+///
 class Controller {
 public:
 
 // ----------------------------------------------------------------------------------------------- //
 
+    ///
+	/// @brief output command usage
+    ///
+    /// @param payload The json message for with command usage
+    ///
     bool help(rapidjson::Value &payload)
     {
         cout << "Controller::help: command: ";
-
-        // implement
 
 		const rapidjson::Value &payloadJSON = payload["payload"];
 		if( !payloadJSON.HasMember("usage") )
@@ -130,6 +145,11 @@ public:
 
 // ----------------------------------------------------------------------------------------------- //
 
+    ///
+	/// @brief exit this application
+    ///
+    /// @param payload The json message for the reason to exit
+    ///
     bool exit(rapidjson::Value &payload)
     {
         cout << "Controller::exit: command: \n";
@@ -160,9 +180,11 @@ public:
 
 // ----------------------------------------------------------------------------------------------- //
 
-    // implement 3-4 more commands
-
+    ///
 	/// @brief authenticate the user
+    ///
+    /// @param payload The json message for authentication
+    ///
 	bool authenticate( rapidjson::Value &payload )
 	{
 		const rapidjson::Value &payloadJSON = payload["payload"];
@@ -180,7 +202,7 @@ public:
 			return false;
 		}
 
-		//authentication prodecures
+		//authentication process
 
 		consoleOut( "User authentiated" );
 
@@ -189,7 +211,11 @@ public:
 
 // ----------------------------------------------------------------------------------------------- //
 
-	/// @brief reload the current authenticated user
+	///
+	/// @brief attempts to reload the current authenticated user
+    ///
+    /// @param payload The json message for reloading the user
+    ///
 	bool reloadUser( rapidjson::Value &payload )
 	{
 		const rapidjson::Value &payloadJSON = payload["payload"];
@@ -216,6 +242,11 @@ public:
 
 // ----------------------------------------------------------------------------------------------- //
 
+	///
+	/// @brief query the health status
+    ///
+    /// @param payload The json message for the device
+    ///
 	bool deviceHealth( rapidjson::Value &payload ) 
 	{
 		const rapidjson::Value &payloadJSON = payload["payload"];
@@ -257,26 +288,32 @@ typedef std::function<bool(rapidjson::Value &)> CommandHandler;
 
 // ----------------------------------------------------------------------------------------------- //
 
-
+///
+/// @brief Command dispatcher class to emplace command handler and dispatching.
+///
 class CommandDispatcher {
 public:
 
 // ----------------------------------------------------------------------------------------------- //
 
-    // ctor - need impl
+	///
+	/// @brief emple constrcutor
+	///
     CommandDispatcher()  
     {
     }
 
 // ----------------------------------------------------------------------------------------------- //
 
-    // dtor - need impl
+    ///
+    /// @brief simple destructor
+    ///
     virtual ~CommandDispatcher()
     {
         // question why is it virtual? Is it needed in this case?
 		/*
-		Making the destrutor virutal will call get called from the derived class.  
-		It's needed here when this class is extended.
+		Making the destrutor virutal will get called from the derived class.
+		It's needed here if this class is extended.
 		*/
 
 		/*
@@ -287,18 +324,24 @@ public:
 
 // ----------------------------------------------------------------------------------------------- //
 
+    ///
+    /// @brief add handler to command
+    ///
+    /// @param command The command string for the handler.
+    /// @param handler The handler to handle the command.
+    ///
     bool addCommandHandler(std::string command, CommandHandler handler)
     {
         cout << "CommandDispatcher: addCommandHandler: " << command << std::endl;
 
 		auto it = command_handlers_.find( command );
 
+		//add new handler for the command
 		if ( it != command_handlers_.end() ) 
 		{
 			command_handlers_.erase( it );
 		}
 
-		// Insert item into std::map
 		command_handlers_.emplace( command, std::move(handler) );
 
         return true;
@@ -306,13 +349,25 @@ public:
 
 // ----------------------------------------------------------------------------------------------- //
 
+    ///
+    /// @brief Dispatch commands
+    ///
+    /// @param command_json The json object with a command strind and it's respective payload
+    ///
     bool dispatchCommand(std::string command_json)
     {
         cout << "COMMAND: " << command_json << endl;
 
 		//contruct json from string
 		rapidjson::Document command;
-		command.Parse( command_json.c_str() );
+
+		try{
+			command.Parse( command_json.c_str() );
+		}
+		catch(const std::runtime_error &er)
+		{
+			std::cout << "Malformed command json string." << std::endl;
+		}
 
 		//check to see if command is present and valid
 		if (!command.IsObject() || !command.HasMember("command"))
@@ -340,7 +395,7 @@ public:
 		}
 
 		//check to see if the payload is present
-		if (!commandJSON.HasMember("payload"))
+		if (!command.HasMember("payload"))
 		{
 			std::cout << "Malformed json, missing payload." << std::endl;
 			return false;
@@ -349,7 +404,7 @@ public:
 		//execute the command handler
 		try 
 		{
-			command_handlers_[commandptr](command);
+			command_handlers_[commandptr]( command );
 		}
 		catch (const std::runtime_error &er)
 		{
@@ -364,7 +419,7 @@ public:
 
 
 private:
-    std::map<std::string, CommandHandler> command_handlers_;
+    std::map<std::string, CommandHandler> command_handlers_;  ///< The container for handlers
 
     // Question: why delete these?
 	/*
@@ -385,20 +440,20 @@ private:
 
 void init_dispatcher( CommandDispatcher &dispatcher, Controller &controller)
 {
-	auto fp = std::bind(&Controller::exit, controller, std::placeholders::_1 );
-	dispatcher.addCommandHandler("exit", fp);
+	auto exitFunc = std::bind(&Controller::exit, controller, std::placeholders::_1 );
+	dispatcher.addCommandHandler("exit", std::move(exitFunc));
 
-	fp = std::bind(&Controller::help, controller, std::placeholders::_1);
-	dispatcher.addCommandHandler("help", fp);
+	auto helpFunc = std::bind(&Controller::help, controller, std::placeholders::_1);
+	dispatcher.addCommandHandler("help", std::move(helpFunc));
 
-	fp = std::bind(&Controller::authenticate, controller, std::placeholders::_1);
-	dispatcher.addCommandHandler("authenticate", fp);
+	auto authenticateFunc = std::bind(&Controller::authenticate, controller, std::placeholders::_1);
+	dispatcher.addCommandHandler("authenticate", std::move(authenticateFunc));
 
-	fp = std::bind(&Controller::reloadUser, controller, std::placeholders::_1);
-	dispatcher.addCommandHandler("reloadUser", fp);
+	auto reloaduserFunc = std::bind(&Controller::reloadUser, controller, std::placeholders::_1);
+	dispatcher.addCommandHandler("reloadUser", std::move(reloaduserFunc));
 
-	fp = std::bind(&Controller::deviceHealth, controller, std::placeholders::_1);
-	dispatcher.addCommandHandler("deviceHealth", fp);
+	auto deviceHealthFunc = std::bind(&Controller::deviceHealth, controller, std::placeholders::_1);
+	dispatcher.addCommandHandler("deviceHealth", std::move(deviceHealthFunc));
 }
 
 // ----------------------------------------------------------------------------------------------- //
