@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <mutex>
+#include <condition_variable>
 
 #include <csignal>
 
@@ -42,6 +43,9 @@ ThreadPool threadPool;
 
 // ----------------------------------------------------------------------------------------------- //
 
+///
+/// @brief INT signal handler to gracefully stop all threads
+///
 void int_signal_handler(int signal_num)
 {
 	m_stop = true;
@@ -54,7 +58,11 @@ void int_signal_handler(int signal_num)
 
 // ----------------------------------------------------------------------------------------------- //
 
+///
 ///@brief output message to console, output is synchronized
+///
+///@param str The string to be printed to console
+///
 void output_to_console(const std::string &str) {
 	LockGuardMtxType LockGuard(m_printMtx);
 	std::cout << str << std::endl;
@@ -62,7 +70,9 @@ void output_to_console(const std::string &str) {
 
 // ----------------------------------------------------------------------------------------------- //
 
+///
 ///@brief spawn working threads
+///
 void spawnThreads( void )
 {
 
@@ -71,6 +81,7 @@ void spawnThreads( void )
 		//capture the thread id by value for each thread
 		threadPool.emplace_back([i]() {
 
+			//pre-construct thread messages
 			std::string threadIdStr{ "thread" + std::to_string(i) };
 			std::string startingStr{ threadIdStr + ": starting, waiting." };
 			std::string workingStr{ threadIdStr + ": signal received, doing work..." };
@@ -106,6 +117,8 @@ void spawnThreads( void )
 			}
 		}
 		);
+		//might need to wait a bit to guarantee thread order.
+		std::this_thread::sleep_for(std::chrono::seconds{ 1 });
 	}
 
 	std::this_thread::sleep_for(std::chrono::seconds{ 1 });
@@ -115,7 +128,7 @@ void spawnThreads( void )
 
 int main(void)
 {
-	//signal(SIGINT, int_signal_handler);
+	signal(SIGINT, int_signal_handler);
 
 	output_to_console( "main: starting all threads.");
 	spawnThreads();
