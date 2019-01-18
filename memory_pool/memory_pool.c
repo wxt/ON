@@ -144,16 +144,12 @@ void * memory_pool_acquire(memory_pool_t * mp)
 		return NULL;
 	}
 
-    // pop stack
 	memory_pool_block_header_t * header = memory_pool_stack[memory_pool_stack_top];
-
 
     // get data block from header
     void * data = MEMORY_POOL_HTODB(header, mp->block_size);
 
-	//memory_pool_stack[memory_pool_stack_top] = NULL;
-
-
+    // pop stack
 	header->inuse = false;
 	mp->available--;
 	memory_pool_stack_top--;
